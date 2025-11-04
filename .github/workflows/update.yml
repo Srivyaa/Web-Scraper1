@@ -1,0 +1,27 @@
+name: Update Streaming Links
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'  # Every 3 hours
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run script
+        run: python script.py
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add output.json
+          git commit -m "Update streaming links [skip ci]" || echo "No changes to commit"
+          git push
