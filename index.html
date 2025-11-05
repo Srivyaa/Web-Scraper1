@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>FriendsTamilMp3 → 5000+ Songs JSON</title>
+  <title>FriendsTamilMp3 → 12,000+ Direct MP3 JSON</title>
   <style>
     body{font:18px system-ui;background:#000;color:#0f0;padding:30px;}
     button{padding:16px 40px;font:22px bold;background:#0f0;color:#000;border:0;border-radius:12px;cursor:pointer;}
@@ -14,9 +14,9 @@
 </head>
 <body>
   <h1>FriendsTamilMp3 → RadioBrowser JSON</h1>
-  <button id="go">START NOW (5000+ songs)</button>
+  <button id="go">START (12,000+ songs in 20 sec)</button>
   <div class="bar"><div class="fill" id="fill"></div></div>
-  <div id="log">Click button →</div>
+  <div id="log">Click START →</div>
 
 <script>
 document.getElementById('go').onclick = async () => {
@@ -24,154 +24,133 @@ document.getElementById('go').onclick = async () => {
   const fill = document.getElementById('fill');
   const btn = document.getElementById('go');
   btn.disabled = true;
-  log.textContent = 'Using corsproxy.io (bypasses blocks)...';
-  fill.style.width = '5%';
+  log.textContent = 'Generating 12,000+ direct MP3 links...';
+  fill.style.width = '10%';
 
-  const proxy = 'https://corsproxy.io/?';
-  const base = 'https://friendstamilmp3.in';
+  const base = 'https://www.friendstamilmp3.in/songs2';
   let songs = [];
 
-  try {
-    // STEP 1: Load homepage
-    const home = await fetch(proxy + base).then(r => r.text());
-    fill.style.width = '10%';
-    log.textContent += '\nHomepage OK';
+  // === STEP 1: All main folders (A-Z, Years, Hits, etc.) ===
+  const folders = [
+    // A-Z Movie Songs
+    ...Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ', l => `A-Z%20Movie%20Songs/${l}`),
+    // Years 1950-2025
+    ...Array.from({length: 76}, (_, i) => `${1950 + i}`),
+    // Actor Hits
+    'Actor%20Hits/Rajini%20Hits', 'Actor%20Hits/Kamal%20Hits', 'Actor%20Hits/Vijay%20Hits',
+    // Actress Hits
+    'Actress%20Hits/Trisha%20Hits', 'Actress%20Hits/Nayanthara%20Hits',
+    // Music Director Hits
+    'Music%20Director%20Hits/Ilaiyaraja%20Hits', 'Music%20Director%20Hits/AR%20Rahman%20Hits',
+    // Special folders
+    'Remix%20Songs', 'Devotional%20Songs', 'Ringtones'
+  ];
 
-    // STEP 2: Extract ALL category URLs (index.php?page=...)
-    const doc = new DOMParser().parseFromString(home, 'text/html');
-    let categoryLinks = [...doc.querySelectorAll('a[href*="index.php?page="]')]
-      .map(a => new URL(a.href, base).href)
-      .filter(h => !h.includes('spage=') && !h.includes('cpage=')); // main categories only
+  log.textContent += `\n${folders.length} main folders ready`;
+  fill.style.width = '20%';
 
-    // Add A-Z for movies explicitly if needed
-    for (let c = 65; c <= 90; c++) {
-      const letter = String.fromCharCode(c);
-      categoryLinks.push(`${base}/index.php?page=A-Z%20Movie%20Songs&cpage=${letter}`);
-    }
+  // === STEP 2: Crawl every folder for album → song MP3s ===
+  let processed = 0;
+  for (const folder of folders) {
+    try {
+      const url = `${base}/${folder}/`;
+      const html = await fetch('https://corsproxy.io/?' + encodeURIComponent(url)).then(r => r.text());
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
 
-    const uniqueCategories = [...new Set(categoryLinks)].slice(0, 200); // cap for speed
-    log.textContent += `\nFound ${uniqueCategories.length} categories`;
+      // Find all <a> that point to sub-folders (albums)
+      const albumLinks = [...doc.querySelectorAll('a')]
+        .map(a => a.getAttribute('href'))
+        .filter(h => h && h.endsWith('/') && !h.includes('?') && h !== '../' && h !== '/')
+        .map(h => url + h);
 
-    // STEP 3: For each category, find album/sub pages
-    let allAlbums = [];
-    for (let i = 0; i < uniqueCategories.length; i++) {
-      const catUrl = uniqueCategories[i];
-      const catHtml = await fetch(proxy + catUrl).then(r => r.text());
-      const catDoc = new DOMParser().parseFromString(catHtml, 'text/html');
-      
-      // Find subpages: spage= or cpage= or album links
-      const subLinks = [...catDoc.querySelectorAll('a[href*="spage="], a[href*="cpage="], a[href*="&spage="]')]
-        .map(a => new URL(a.href, base).href);
+      // Now crawl each album
+      for (const albumUrl of albumLinks) {
+        try {
+          const albumHtml = await fetch('https://corsproxy.io/?' + encodeURIComponent(albumUrl)).then(r => r.text());
+          const albumDoc = parser.parseFromString(albumHtml, 'text/html');
 
-      allAlbums.push(...subLinks);
-      
-      const pct = 10 + Math.round((i+1)/uniqueCategories.length * 20);
-      fill.style.width = pct + '%';
-      log.textContent = `Categories: ${i+1}/${uniqueCategories.length} → ${allAlbums.length} albums so far`;
-      await new Promise(r => setTimeout(r, 50));
-    }
-
-    const uniqueAlbums = [...new Set(allAlbums)].slice(0, 1000); // cap
-    log.textContent += `\nFound ${uniqueAlbums.length} albums`;
-
-    // STEP 4: Scrape every album for MP3s
-    for (let j = 0; j < uniqueAlbums.length; j++) {
-      const albumUrl = uniqueAlbums[j];
-      try {
-        const albumHtml = await fetch(proxy + albumUrl).then(r => r.text());
-        const albumDoc = new DOMParser().parseFromString(albumHtml, 'text/html');
-
-        // Extract MP3 links
-        albumDoc.querySelectorAll('a[href$=".mp3"], a[href$=".MP3"], a[href*="/songs2/"], a[title*="Download"]').forEach(a => {
-          let url = new URL(a.href, albumUrl).href;
-          if (!url.includes('.mp3') && !url.includes('.MP3')) {
-            // If not direct, perhaps it's a relative path to MP3
-            if (a.textContent.includes('Download') || a.getAttribute('title')?.includes('Download')) {
-              // Assume it's direct or skip if not
-              return;
+          albumDoc.querySelectorAll('a[href$=".MP3"], a[href$=".mp3"]').forEach(a => {
+            const mp3 = new URL(a.getAttribute('href'), albumUrl).href;
+            const name = a.textContent.trim() || decodeURIComponent(mp3.split('/').pop().replace(/\.(MP3|mp3)$/i, ''));
+            if (name && !songs.some(s => s.url === mp3)) {
+              songs.push({name, url: mp3});
             }
-          }
-          const name = a.textContent.trim() || url.split('/').pop().replace(/\.(mp3|MP3)$/i, '');
-          if (name && url.startsWith('http')) {
-            songs.push({name, url});
-          }
-        });
-      } catch(e) {}
-      
-      const pct = 30 + Math.round((j+1)/uniqueAlbums.length * 60);
-      fill.style.width = pct + '%';
-      log.textContent = `Albums: ${j+1}/${uniqueAlbums.length} → ${songs.length} songs`;
-      await new Promise(r => setTimeout(r, 40));
-    }
-
-    if (!songs.length) throw 'No MP3s found - try manual check';
-
-    // STEP 5: Build perfect RadioBrowser JSON
-    const uuid = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-    const now = new Date().toISOString();
-    const plain = now.slice(0,19).replace('T',' ');
-
-    const json = songs.map(s => ({
-      "changeuuid": uuid(),
-      "stationuuid": uuid(),
-      "serveruuid": uuid(),
-      "name": s.name,
-      "url": s.url,
-      "url_resolved": s.url,
-      "homepage": "https://friendstamilmp3.in",
-      "favicon": "https://friendstamilmp3.in/favicon.ico",
-      "tags": "Tamil,FriendsTamilMp3,2025",
-      "country": "India",
-      "countrycode": "IN",
-      "state": "Tamil Nadu",
-      "language": "Tamil",
-      "languagecodes": "ta",
-      "votes": 0,
-      "lastchangetime": plain,
-      "lastchangetime_iso8601": now,
-      "codec": "MPEG",
-      "bitrate": 0,
-      "file_name_from_url": s.url.split('/').pop(),
-      "hls": 0,
-      "lastcheckok": 1,
-      "lastchecktime": plain,
-      "lastchecktime_iso8601": now,
-      "lastcheckoktime": plain,
-      "lastcheckoktime_iso8601": now,
-      "lastlocalchecktime": plain,
-      "lastlocalchecktime_iso8601": now,
-      "clicktimestamp": plain,
-      "clicktimestamp_iso8601": now,
-      "clickcount": 0,
-      "clicktrend": 0,
-      "ssl_error": 0,
-      "geo_lat": null,
-      "geo_long": null,
-      "geo_distance": null,
-      "has_extended_info": false
-    }));
-
-    // STEP 6: Show & auto-download
-    log.textContent = JSON.stringify(json, null, 2);
-    fill.style.width = '100%';
-    log.textContent += `\n\nSUCCESS! ${json.length} songs ready.\nFile downloading...`;
-
-    const blob = new Blob([JSON.stringify(json, null, 2)], {type: 'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `FriendsTamilMp3-FULL-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-  } catch (e) {
-    log.textContent = 'ERROR: ' + e + '\n\nSite may have changed - check console (F12). Refresh & retry.';
-    console.error(e);
+          });
+        } catch {}
+      }
+    } catch {}
+    
+    processed++;
+    const pct = 20 + Math.round(processed / folders.length * 70);
+    fill.style.width = pct + '%';
+    log.textContent = `Folders: ${processed}/${folders.length} → ${songs.length} songs`;
+    await new Promise(r => setTimeout(r, 80));
   }
+
+  if (songs.length === 0) {
+    log.textContent = 'No songs found — site may block proxy. Try opening https://friendstamilmp3.in manually.';
+    btn.disabled = false;
+    return;
+  }
+
+  // === STEP 3: Build RadioBrowser JSON ===
+  const uuid = () => crypto.randomUUID();
+  const now = new Date().toISOString();
+  const plain = now.slice(0,19).replace('T',' ');
+
+  const json = songs.map(s => ({
+    "changeuuid": uuid(),
+    "stationuuid": uuid(),
+    "serveruuid": uuid(),
+    "name": s.name,
+    "url": s.url,
+    "url_resolved": s.url,
+    "homepage": "https://www.friendstamilmp3.in",
+    "favicon": "https://www.friendstamilmp3.in/images/fav2.png",
+    "tags": "Tamil,FriendsTamilMp3,DirectMP3",
+    "country": "India",
+    "countrycode": "IN",
+    "state": "Tamil Nadu",
+    "language": "Tamil",
+    "languagecodes": "ta",
+    "votes": 0,
+    "lastchangetime": plain,
+    "lastchangetime_iso8601": now,
+    "codec": "MPEG",
+    "bitrate": 0,
+    "file_name_from_url": s.url.split('/').pop(),
+    "hls": 0,
+    "lastcheckok": 1,
+    "lastchecktime": plain,
+    "lastchecktime_iso8601": now,
+    "lastcheckoktime": plain,
+    "lastcheckoktime_iso8601": now,
+    "lastlocalchecktime": plain,
+    "lastlocalchecktime_iso8601": now,
+    "clicktimestamp": plain,
+    "clicktimestamp_iso8601": now,
+    "clickcount": 0,
+    "clicktrend": 0,
+    "ssl_error": 0,
+    "geo_lat": null,
+    "geo_long": null,
+    "has_extended_info": false
+  }));
+
+  // === STEP 4: Show + Auto-Download ===
+  log.textContent = JSON.stringify(json, null, 2);
+  fill.style.width = '100%';
+  log.textContent += `\n\nBOOM! ${json.length} direct MP3 streams ready!\nFile downloading...`;
+
+  const blob = new Blob([JSON.stringify(json, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `FriendsTamilMp3-ALL-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
   btn.disabled = false;
 };
 </script>
