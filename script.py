@@ -66,4 +66,20 @@ for vid, name in RHYMES:
             "lastcheckoktime": now()[:-1],
             "lastcheckoktime_iso8601": now(),
             "lastlocalchecktime": now()[:-1],
-            "lastlocalchecktime_iso8601":
+            "lastlocalchecktime_iso8601": now(),
+            "clicktimestamp": now()[:-1],
+            "clicktimestamp_iso8601": now(),
+            "clickcount": 0,
+            "clicktrend": 0,
+            "ssl_error": 0,
+            "geo_lat": None,
+            "geo_long": None,
+            "geo_distance": None,
+            "has_extended_info": False
+        })
+        print(f"Success: {name}")
+    except Exception as e:
+        print(f"Failed: {name} → {e}")
+
+json.dump(entries, open('output.json','w'), indent=2)
+print(f"\n{len(entries)} TAMIL RHYMES READY → output.json")
