@@ -1,56 +1,49 @@
 # script.py
-import json
-import datetime
-import uuid
-import os
+import json, datetime, uuid, os
 from yt_dlp import YoutubeDL
 
 def now():
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
-
-# Bypass YouTube bot-check
-os.environ['YT_DLP_BYPASS'] = '1'
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z')
 
 ydl = YoutubeDL({
     'format': 'bestaudio/best',
     'quiet': True,
     'no_warnings': True,
-    'socket_timeout': 30,
-    'retries': 3,
+    'socket_timeout': 15,
+    'retries': 2,
     'http_headers': {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     },
     'age_limit': 99,
     'skip_download': True,
+    'extractor_args': {'youtube': {'player_client': ['web']}},
 })
 
-# Read links
+# READ LINKS
 try:
-    with open('links.txt') as f:
-        urls = [line.strip() for line in f if line.strip().startswith('http')]
-except FileNotFoundError:
-    print("links.txt not found!")
+    urls = [l.strip() for l in open('links.txt') if l.strip().startswith('http')]
+except:
     urls = []
 
 entries = []
-
 for url in urls:
     try:
         info = ydl.extract_info(url, download=False)
         if 'entries' in info:
             info = info['entries'][0]
 
-        direct_url = info['url'].split('?')[0]
+        direct = info['url'].split('?')[0]
+        title = info.get('title','Live')[:60]
 
-        entry = {
+        entries.append({
             "changeuuid": str(uuid.uuid4()),
             "stationuuid": str(uuid.uuid5(uuid.NAMESPACE_URL, url)),
-            "serveruuid": str(uuid.uuid5(uuid.NAMESPACE_URL, url + "_srv")),
-            "name": info.get('title', 'Unknown'),
+            "serveruuid": str(uuid.uuid5(uuid.NAMESPACE_URL, url+"_srv")),
+            "name": title,
             "url": url,
-            "url_resolved": direct_url,
-            "homepage": info.get('uploader_url', 'https://youtube.com'),
-            "favicon": info.get('thumbnail', ''),
+            "url_resolved": direct,
+            "homepage": info.get('uploader_url','https://youtube.com'),
+            "favicon": info.get('thumbnail',''),
             "tags": "",
             "country": "User Defined (YouTube)",
             "countrycode": "YT",
@@ -62,8 +55,8 @@ for url in urls:
             "lastchangetime": now()[:-1],
             "lastchangetime_iso8601": now(),
             "codec": "MP3",
-            "bitrate": info.get('abr', 128),
-            "file_name_from_url": (info.get('title', 'song')[:50].replace(' ', '_') + ".mp3"),
+            "bitrate": info.get('abr',128),
+            "file_name_from_url": title.replace(' ','_') + ".mp3",
             "hls": 0,
             "lastcheckok": 1,
             "lastchecktime": now()[:-1],
@@ -81,14 +74,10 @@ for url in urls:
             "geo_long": None,
             "geo_distance": None,
             "has_extended_info": False
-        }
-        entries.append(entry)
-        print(f"Success: {info['title']}")
+        })
+        print(f"Success: {title}")
     except Exception as e:
         print(f"Failed: {url} → {e}")
 
-# Save
-with open('output.json', 'w', encoding='utf-8') as f:
-    json.dump(entries, f, indent=2, ensure_ascii=False)
-
-print(f"\n{len(entries)} stations saved to output.json")
+json.dump(entries, open('output.json','w'), indent=2)
+print(f"\n{len(entries)} WORKING stations → output.json")
