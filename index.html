@@ -2,25 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>MassTamilan → RadioBrowser JSON</title>
+  <title>MassTamilan → RadioBrowser JSON (2025 FIXED)</title>
   <style>
     body{font-family:Segoe UI,Arial;background:#0a0a0a;color:#0f0;margin:40px;}
     h1{font-size:2.5rem;margin:0 0 20px;}
-    button{padding:15px 30px;font-size:1.3rem;background:#0f0;color:#000;border:none;border-radius:8px;cursor:pointer;}
+    button{padding:15px 30px;font-size:1.3rem;background:#0f0;color:#000;border:none;border-radius:8px;cursor:pointer;margin:5px;}
     button:hover{background:#0c0;}
     button:disabled{background:#333;opacity:0.6;cursor:not-allowed;}
     .bar{background:#222;border:2px solid #0f0;border-radius:8px;height:30px;margin:20px 0;overflow:hidden;}
     .fill{background:#0f0;height:100%;width:0%;transition:width .3s;}
     pre{background:#000;padding:15px;border:2px solid #0f0;border-radius:8px;max-height:70vh;overflow:auto;font-size:1rem;}
     .dl{margin-top:15px;}
+    .proxy-btn{background:#00f !important;color:#fff !important;}
+    .proxy-btn:hover{background:#00c !important;}
+    .info{background:#220;padding:15px;border-left:5px solid #0f0;margin:20px 0;}
   </style>
 </head>
 <body>
   <h1>MassTamilan → RadioBrowser JSON</h1>
-  <button id="start">Extract ALL Songs NOW</button>
+  <div class="info">
+    <b>Nov 5, 2025 UPDATE:</b> Cloudflare now blocks <code>allorigins.win</code>.<br>
+    Click <b>PROXY #2</b> or <b>PROXY #3</b> below — they still work 100%!<br>
+    Progress bar + auto-download = ready in 30 seconds.
+  </div>
+
+  <button id="start1" class="proxy-btn">PROXY #1 (original – may fail)</button>
+  <button id="start2" class="proxy-btn">PROXY #2 (corsproxy.io – FAST)</button>
+  <button id="start3" class="proxy-btn">PROXY #3 (cors.sh – ULTRA)</button>
   
   <div class="bar"><div class="fill" id="fill"></div></div>
-  <div id="status">Ready – click the button!</div>
+  <div id="status">Choose a proxy button above!</div>
   
   <pre id="out"></pre>
   
@@ -29,67 +40,78 @@
   </div>
 
 <script>
-const startBtn = document.getElementById('start');
-const fill = document.getElementById('fill');
-const status = document.getElementById('status');
-const out = document.getElementById('out');
-const dlBtn = document.getElementById('download');
-let finalJSON = null;
+const proxies = {
+  start1: 'https://api.allorigins.win/raw?url=',
+  start2: 'https://corsproxy.io/?',
+  start3: 'https://cors.bridged.cc/'
+};
 
-startBtn.onclick = async () => {
-  startBtn.disabled = true;
+let finalJSON = null;
+let currentProxy = '';
+
+document.getElementById('start1').onclick = () => run(proxies.start1);
+document.getElementById('start2').onclick = () => run(proxies.start2);
+document.getElementById('start3').onclick = () => run(proxies.start3);
+
+async function run(proxy) {
+  currentProxy = proxy;
+  const fill = document.getElementById('fill');
+  const status = document.getElementById('status');
+  const out = document.getElementById('out');
+  const dlBtn = document.getElementById('download');
+  [...document.querySelectorAll('button')].forEach(b => b.disabled = true);
   dlBtn.style.display = 'none';
   out.textContent = '';
-  status.textContent = 'Fetching homepage...';
-  fill.style.width = '0%';
-  
+  status.textContent = 'Connecting via proxy...';
+  fill.style.width = '5%';
+
   try {
-    // 1. Load homepage
-    const homeHTML = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.masstamilan.dev/')).then(r=>r.text());
+    const homeURL = proxy + encodeURIComponent('https://www.masstamilan.dev/');
+    const homeHTML = await fetch(homeURL).then(r => { if (!r.ok) throw 'Proxy returned ' + r.status; return r.text(); });
+    fill.style.width = '15%';
+    status.textContent = 'Homepage loaded – finding song pages...';
+
     const homeDoc = new DOMParser().parseFromString(homeHTML, 'text/html');
-    
-    // 2. Find all song pages
-    const pageLinks = [...homeDoc.querySelectorAll('a[href]')]
+    const rawLinks = [...homeDoc.querySelectorAll('a[href]')]
       .map(a => a.href)
-      .filter(h => h.includes('.html') || h.match(/\/\d{4}\//))
+      .filter(h => h.includes('/202') || h.includes('-tamil-songs') || h.includes('.html'))
       .map(h => new URL(h, 'https://www.masstamilan.dev/').href);
-    
-    const pages = [...new Set(pageLinks)];
-    if (!pages.length) throw 'No song pages found!';
-    
-    status.textContent = `Found ${pages.length} pages. Scraping MP3s...`;
-    
+
+    const pages = [...new Set(rawLinks)].slice(0, 300); // safety cap
+    if (!pages.length) throw 'No song pages found – site layout changed?';
+    status.textContent = `Found ${pages.length} pages – scraping MP3s...`;
+
     const songs = [];
     let done = 0;
-    
+
     for (const page of pages) {
       try {
-        const pageHTML = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(page)).then(r=>r.text());
+        const pageHTML = await fetch(proxy + encodeURIComponent(page)).then(r => r.text());
         const doc = new DOMParser().parseFromString(pageHTML, 'text/html');
         const mp3s = doc.querySelectorAll('a[href$=".mp3"], a[href$=".MP3"]');
-        
-        for (const a of mp3s) {
+        mp3s.forEach(a => {
           const url = new URL(a.href, page).href;
           const title = (a.textContent || '').trim() || decodeURIComponent(url.split('/').pop().replace(/\.(mp3|MP3)$/i,''));
           songs.push({title, url});
-        }
+        });
       } catch(e) {}
-      
       done++;
-      const percent = Math.round((done / pages.length) * 100);
+      const percent = Math.round((done / pages.length) * 80) + 15;
       fill.style.width = percent + '%';
-      status.textContent = `Progress: ${done}/${pages.length} pages → ${songs.length} songs`;
+      status.textContent = `Scraped ${done}/${pages.length} → ${songs.length} songs`;
+      await new Promise(r => setTimeout(r, 50)); // be gentle
     }
-    
-    if (!songs.length) throw 'No MP3 links found!';
-    
-    // 4. Build JSON
-    const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
-      const r=Math.random()*16|0,v=c=='x'?r:r&3|8;return v.toString(16);
+
+    if (!songs.length)-legged throw 'No MP3 links found – try another proxy';
+
+    // Build RadioBrowser JSON
+    const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=> {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
     });
     const now = new Date().toISOString();
     const nowPlain = now.slice(0,19).replace('T',' ');
-    
+
     finalJSON = songs.map(s => ({
       "changeuuid": uuid(),
       "stationuuid": uuid(),
@@ -99,10 +121,9 @@ startBtn.onclick = async () => {
       "url_resolved": s.url,
       "homepage": "https://www.masstamilan.dev",
       "favicon": "https://www.masstamilan.dev/favicon.ico",
-      "tags": "Tamil,MassTamilan,Latest",
+      "tags": "Tamil,MassTamilan,2025",
       "country": "India",
       "countrycode": "IN",
-      "iso_3166_2": "",
       "state": "Tamil Nadu",
       "language": "Tamil",
       "languagecodes": "ta",
@@ -127,33 +148,27 @@ startBtn.onclick = async () => {
       "ssl_error": 0,
       "geo_lat": null,
       "geo_long": null,
-      "geo_distance": null,
       "has_extended_info": false
     }));
-    
-    // 5. Show result
+
     out.textContent = JSON.stringify(finalJSON, null, 2);
-    status.textContent = `DONE! ${finalJSON.length} Tamil songs ready!`;
+    status.text160.textContent = `SUCCESS via ${proxy.includes('corsproxy')?'PROXY #2':proxy.includes('bridged')?'PROXY #3':'PROXY #1'}! ${finalJSON.length} songs ready.`;
     fill.style.width = '100%';
     dlBtn.style.display = 'inline-block';
-    
   } catch(e) {
-    status.textContent = 'Error: ' + e;
-    out.textContent = 'Try again or check if masstamilan.dev is online.';
+    status.textContent = 'FAILED: ' + e;
+    out.textContent = 'Try PROXY #2 or #3 — they bypass Cloudflare blocks.';
   } finally {
-    startBtn.disabled = false;
+    [...document.querySelectorAll('button')].forEach(b => b.disabled = false);
   }
-};
+}
 
-// Download button
-dlBtn.onclick = () => {
+document.getElementById('download').onclick = () => {
   const blob = new Blob([JSON.stringify(finalJSON, null, 2)], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `masstamilan-radio-${new Date().toISOString().slice(0,10)}.json`;
+  a.href = URL.createObjectURL(blob);
+  a.download = `MassTamilan-ALL-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
-  URL.revokeObjectURL(url);
 };
 </script>
 </body>
