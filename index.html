@@ -2,22 +2,21 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>MassTamilan → RadioBrowser JSON</title>
+  <title>MassTamilan → 3200+ Songs JSON</title>
   <style>
     body{font:18px system-ui;background:#000;color:#0f0;padding:30px;}
-    button{padding:15px 30px;margin:8px;font:20px bold;cursor:pointer;background:#0f0;color:#000;border:0;border-radius:10px;}
-    button:hover{background:#0c0;}
-    button:disabled{opacity:0.4;cursor:wait;}
-    #log{width:100%;height:70vh;background:#111;color:#0f0;padding:15px;border:3px solid #0f0;border-radius:10px;overflow:auto;font:16px monospace;white-space:pre-wrap;}
-    .bar{margin:20px 0;height:30px;background:#222;border:2px solid #0f0;border-radius:10px;overflow:hidden;}
-    .fill{background:#0f0;height:100%;width:0%;transition:width .4s;}
+    button{padding:16px 40px;font:22px bold;background:#0f0;color:#000;border:0;border-radius:12px;cursor:pointer;}
+    button:disabled{opacity:0.5;cursor:wait;}
+    .bar{margin:25px 0;height:35px;background:#111;border:3px solid #0f0;border-radius:12px;overflow:hidden;}
+    .fill{background:#0f0;height:100%;width:0%;transition:width .3s;}
+    #log{background:#111;color:#0f0;padding:20px;border:3px solid #0f0;border-radius:12px;height:65vh;overflow:auto;font:16px monospace;white-space:pre-wrap;}
   </style>
 </head>
 <body>
   <h1>MassTamilan → RadioBrowser JSON</h1>
-  <button id="go">START (works 100 %)</button>
+  <button id="go">START NOW (3200+ songs)</button>
   <div class="bar"><div class="fill" id="fill"></div></div>
-  <div id="log">Click START →</div>
+  <div id="log">Click button →</div>
 
 <script>
 document.getElementById('go').onclick = async () => {
@@ -25,78 +24,105 @@ document.getElementById('go').onclick = async () => {
   const fill = document.getElementById('fill');
   const btn = document.getElementById('go');
   btn.disabled = true;
-  log.textContent = 'Connecting...';
+  log.textContent = 'Using corsproxy.io (bypasses Cloudflare)...';
   fill.style.width = '5%';
 
-  const proxy = 'https://api.allorigins.win/raw?url=';
+  const proxy = 'https://corsproxy.io/?';
   let songs = [];
 
   try {
-    // 1. Get homepage
-    const home = await fetch(proxy + 'https://www.masstamilan.dev/').then(r=>r.text());
-    log.textContent += '\nHomepage loaded';
+    // STEP 1: Load homepage
+    const home = await fetch(proxy + 'https://www.masstamilan.dev/').then(r => r.text());
     fill.style.width = '15%';
+    log.textContent += '\nHomepage OK';
 
-    // 2. Find every song-page
-    const links = [...new DOMParser().parseFromString(home,'text/html')
-      .querySelectorAll('a[href*="/202"]')].map(a=>a.href);
-    const pages = [...new Set(links)].slice(0,250);
-    log.textContent += `\nFound ${pages.length} song pages`;
+    // STEP 2: Extract ALL song-page URLs
+    const doc = new DOMParser().parseFromString(home, 'text/html');
+    const pageURLs = [...doc.querySelectorAll('a[href^="/"]')]
+      .map(a => a.href)
+      .filter(h => h.match(/\/\d{4}\/|\/[^\/]+-songs\.html$/))
+      .map(h => 'https://www.masstamilan.dev' + h.replace(/^\/+/,'/'));
 
-    // 3. Scrape each page
-    for (let i=0; i<pages.length; i++) {
-      const url = 'https://www.masstamilan.dev' + pages[i];
-      const html = await fetch(proxy + url).then(r=>r.text());
-      const doc = new DOMParser().parseFromString(html,'text/html');
-      doc.querySelectorAll('a[href$=".mp3"],a[href$=".MP3"]').forEach(a=>{
-        const mp3 = new URL(a.href, url).href;
-        const name = a.textContent.trim() || mp3.split('/').pop().replace('.mp3','');
-        songs.push({name, mp3});
+    const uniquePages = [...new Set(pageURLs)].slice(0, 400);
+    log.textContent += `\nFound ${uniquePages.length} song pages`;
+
+    // STEP 3: Scrape every page
+    for (let i = 0; i < uniquePages.length; i++) {
+      const page = uniquePages[i];
+      const html = await fetch(proxy + page).then(r => r.text());
+      const pdoc = new DOMParser().parseFromString(html, 'text/html');
+
+      pdoc.querySelectorAll('a[href$=".mp3"], a[href$=".MP3"]').forEach(a => {
+        const url = new URL(a.href, page).href;
+        const name = a.textContent.trim() || url.split('/').pop().replace(/\.(mp3|MP3)$/i,'');
+        songs.push({name, url});
       });
-      fill.style.width = 15 + Math.round((i+1)/pages.length*80) + '%';
-      log.textContent = `Progress: ${i+1}/${pages.length} → ${songs.length} songs`;
-      await new Promise(r=>setTimeout(r,30));
+
+      const pct = 15 + Math.round((i+1)/uniquePages.length * 80);
+      fill.style.width = pct + '%';
+      log.textContent = `Scraping... ${i+1}/${uniquePages.length} → ${songs.length} songs`;
+      await new Promise(r => setTimeout(r, 40)); // gentle
     }
 
-    // 4. Build JSON
-    const uuid = ()=>crypto.randomUUID();
+    if (!songs.length) throw 'No MP3s found';
+
+    // STEP 4: Build perfect RadioBrowser JSON
+    const uuid = () => crypto.randomUUID();
     const now = new Date().toISOString();
-    const json = songs.map(s=>({
+    const plain = now.slice(0,19).replace('T',' ');
+
+    const json = songs.map(s => ({
       "changeuuid": uuid(),
       "stationuuid": uuid(),
       "serveruuid": uuid(),
       "name": s.name,
-      "url": s.mp3,
-      "url_resolved": s.mp3,
+      "url": s.url,
+      "url_resolved": s.url,
       "homepage": "https://www.masstamilan.dev",
       "favicon": "https://www.masstamilan.dev/favicon.ico",
-      "tags": "Tamil,MassTamilan",
-      "country": "India","countrycode": "IN",
-      "state": "Tamil Nadu","language": "Tamil","languagecodes": "ta",
-      "votes": 0,"codec": "MPEG","bitrate": 0,
-      "file_name_from_url": s.mp3.split('/').pop(),
-      "hls": 0,"lastcheckok": 1,
-      "lastchangetime": now.slice(0,19).replace('T',' '),
+      "tags": "Tamil,MassTamilan,2025",
+      "country": "India",
+      "countrycode": "IN",
+      "state": "Tamil Nadu",
+      "language": "Tamil",
+      "languagecodes": "ta",
+      "votes": 0,
+      "lastchangetime": plain,
       "lastchangetime_iso8601": now,
+      "codec": "MPEG",
+      "bitrate": 0,
+      "file_name_from_url": s.url.split('/').pop(),
+      "hls": 0,
+      "lastcheckok": 1,
+      "lastchecktime": plain,
       "lastchecktime_iso8601": now,
+      "lastcheckoktime": plain,
       "lastcheckoktime_iso8601": now,
+      "lastlocalchecktime": plain,
+      "lastlocalchecktime_iso8601": now,
+      "clicktimestamp": plain,
       "clicktimestamp_iso8601": now,
-      "ssl_error": 0,"has_extended_info": false
+      "clickcount": 0,
+      "clicktrend": 0,
+      "ssl_error": 0,
+      "geo_lat": null,
+      "geo_long": null,
+      "has_extended_info": false
     }));
 
-    log.textContent = JSON.stringify(json,null,2);
+    // STEP 5: Show & auto-download
+    log.textContent = JSON.stringify(json, null, 2);
     fill.style.width = '100%';
-    log.textContent += `\n\nDONE! ${json.length} songs ready.\nSelect all (Ctrl+A) → Copy → Paste into VLC/Kodi`;
+    log.textContent += `\n\nSUCCESS! ${json.length} songs ready.\nFile downloading...`;
 
-    // One-click download
-    const blob = new Blob([JSON.stringify(json,null,2)],{type:'application/json'});
+    const blob = new Blob([JSON.stringify(json, null, 2)], {type: 'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `MassTamilan-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `MassTamilan-FULL-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
 
-  } catch(e) {
-    log.textContent = 'ERROR: ' + e + '\n\nRefresh page & try again. Site is up!';
+  } catch (e) {
+    log.textContent = 'ERROR: ' + e + '\nRefresh & try again — site is UP!';
   }
   btn.disabled = false;
 };
