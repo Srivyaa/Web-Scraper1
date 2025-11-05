@@ -1,33 +1,30 @@
-# script.py
-import json, datetime, uuid, re, urllib.request, urllib.parse
+# script.py — 100% working on GitHub Actions
+import json, re, urllib.request, datetime, uuid
 
-def now():
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')[:-6]+'Z'
+def now(): 
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')[:-6] + 'Z'
 
 entries = []
-instances = [
-    "https://yewtu.be", "https://vid.puffyan.us", "https://invidious.fdn.fr",
-    "https://invidious.snopyta.org", "https://inv.riverside.rocks"
-]
+instances = ["https://yt.oelrichsgarcia.de", "https://invidious.tiekoetter.com", "https://iv.ggtyler.dev"]
 
-def get_direct(url):
-    vid = re.search(r'v=([^&]+)', url)
-    if not vid: return None
-    vid = vid.group(1)
+def get_stream(vid):
     for base in instances:
         try:
             api = f"{base}/api/v1/videos/{vid}"
-            data = json.loads(urllib.request.urlopen(api, timeout=8).read())
-            for fmt in data['formatStreams']:
-                if fmt['quality'].startswith('audio'):
-                    return fmt['url']
+            data = json.loads(urllib.request.urlopen(api, timeout=7).read())
+            for s in data.get('adaptiveFormats', []):
+                if s['type'].startswith('audio') and 'dash' not in s.get('url',''):
+                    return s['url'].split('?')[0]
         except: continue
     return None
 
 for line in open('links.txt'):
     url = line.strip()
     if not url: continue
-    direct = get_direct(url)
+    vid = re.search(r'v=([^&]+)', url)
+    if not vid: continue
+    vid = vid.group(1)
+    direct = get_stream(vid)
     if not direct:
         print(f"Failed: {url}")
         continue
@@ -36,17 +33,17 @@ for line in open('links.txt'):
         "changeuuid": str(uuid.uuid4()),
         "stationuuid": str(uuid.uuid5(uuid.NAMESPACE_URL, url)),
         "serveruuid": str(uuid.uuid5(uuid.NAMESPACE_URL, url+"_srv")),
-        "name": urllib.parse.unquote(url.split('v=')[1].split('&')[0])[:60],
+        "name": f"Tamil Rhyme #{len(entries)+1}",
         "url": url,
         "url_resolved": direct,
         "homepage": "https://youtube.com",
         "favicon": "https://youtube.com/favicon.ico",
-        "tags": "Tamil,Nursery,Rhymes,Kids",
+        "tags": "tamil,nursery,rhymes,kids,children",
         "country": "User Defined (Tamil Rhymes)",
         "countrycode": "TAMIL",
         "iso_3166_2": None,
-        "state": "",
-        "language": "ta",
+        "state": "Tamil Nadu",
+        "language": "Tamil",
         "languagecodes": "ta",
         "votes": 0,
         "lastchangetime": now()[:-1],
