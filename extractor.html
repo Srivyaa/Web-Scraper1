@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MassTamilan → RadioBrowser JSON</title>
+  <style>
+    body{font-family:Arial;background:#111;color:#0f0;padding:2rem;}
+    pre{background:#000;padding:1rem;border:2px solid #0f0;overflow:auto;}
+    button{padding:1rem 2rem;font-size:1.2rem;margin:1rem 0;}
+  </style>
+</head>
+<body>
+  <h1>MassTamilan MP3 → RadioBrowser JSON</h1>
+  <button onclick="run()">🚀 Extract ALL songs</button>
+  <pre id="out">Click the button →</pre>
+
+<script>
+async function run() {
+  const out = document.getElementById('out');
+  out.textContent = 'Fetching page...';
+  try {
+    const html = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.masstamilan.dev/')).then(r=>r.text());
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const links = [...doc.querySelectorAll('a[href$=".mp3"], a[href$=".MP3"]')];
+    if (!links.length) throw 'No .mp3 links found – site layout changed?';
+
+    const base = 'https://www.masstamilan.dev';
+    const json = links.map((a,i) => {
+      const url = new URL(a.href, base).href;
+      const name = a.textContent.trim() || url.split('/').pop().replace('.mp3','').replace('.MP3','');
+      const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+        const r=Math.random()*16|0,v=c=='x'?r:r&3|8;return v.toString(16);
+      });
+      return {
+        "changeuuid": uuid(),
+        "stationuuid": uuid(),
+        "serveruuid": uuid(),
+        "name": name,
+        "url": url,
+        "url_resolved": url,
+        "homepage": "https://www.masstamilan.dev",
+        "favicon": "https://www.masstamilan.dev/favicon.ico",
+        "tags": "Tamil;MassTamilan;Latest",
+        "country": "India",
+        "countrycode": "IN",
+        "iso_3166_2": "",
+        "state": "Tamil Nadu",
+        "language": "Tamil",
+        "languagecodes": "ta",
+        "votes": 0,
+        "lastchangetime": new Date().toISOString().slice(0,19).replace('T',' '),
+        "lastchangetime_iso8601": new Date().toISOString(),
+        "codec": "MPEG",
+        "bitrate": 0,
+        "file_name_from_url": url.split('/').pop(),
+        "hls": 0,
+        "lastcheckok": 1,
+        "lastchecktime": new Date().toISOString().slice(0,19).replace('T',' '),
+        "lastchecktime_iso8601": new Date().toISOString(),
+        "lastcheckoktime": new Date().toISOString().slice(0,19).replace('T',' '),
+        "lastcheckoktime_iso8601": new Date().toISOString(),
+        "lastlocalchecktime": new Date().toISOString().slice(0,19).replace('T',' '),
+        "lastlocalchecktime_iso8601": new Date().toISOString(),
+        "clicktimestamp": new Date().toISOString().slice(0,19).replace('T',' '),
+        "clicktimestamp_iso8601": new Date().toISOString(),
+        "clickcount": 0,
+        "clicktrend": 0,
+        "ssl_error": 0,
+        "geo_lat": null,
+        "geo_long": null,
+        "geo_distance": null,
+        "has_extended_info": false
+      };
+    });
+
+    out.textContent = JSON.stringify(json, null, 2);
+    console.log('Done →', json.length, 'stations');
+  } catch(e) {
+    out.textContent = 'Error: ' + e;
+  }
+}
+</script>
+</body>
+</html>
